@@ -3,9 +3,9 @@
 
 class Board
 
-  attr_reader :pieces
-
   # helper hashes for easier conversion in methods
+  @@row_letters = %w[A B C D E F G H I J]
+  @@col_numbers = %w[0 1 2 3 4 5 6 7 8 9]
   @@letter_as_number = {"A" => 0, "B" => 1, "C" => 2, "D" => 3, "E" => 4, "F" => 5,
     "G" => 6, "H" => 7, "I" => 8, "J" => 9}
   @@number_as_letter = {0 => "A", 1 => "B", 2 => "C", 3 => "D", 4 => "E", 5 => "F",
@@ -19,25 +19,118 @@ class Board
     @ds = ["",""]             # destroyer
     @sb = [""]                # submarine
     @pieces = [@ac, @bs, @cr, @ds, @sb]
-    @avail_cells = [%w[A1,B1,C1,D1,E1],%w[F1,F2,F3,F4],%w[C2,D2,E2],%w[I3,J3],%w[G10]]
+    # row letter is key, cells are values
+    @avail_horiz_cells_hash = avail_horiz_cells_init 
+    # col number is key, cells are values
+    @avail_vert_cells_hash = avail_vert_cells_init
+    place_pieces
+    p @ac
+    p @bs
+    p @cr
+    p @ds
+    p @sb
+    # p @avail_horiz_cells_hash
+    # p @avail_vert_cells_hash
   end
 
-  def place_pieces(pieces)
-    pieces.each do |piece|
-      cell = candidate_cell
-      direction = candidate_direction
-      length = piece.length
-      positions = cells_available_for_placement
-      place_piece(piece, positions )
-      # prev line should always have an array of avail. cells passed to 2nd arg
+  def avail_horiz_cells_init
+    horiz_cells = []
+    @@row_letters.each do |row_letter|
+      @@col_numbers.each do |col_number|
+        horiz_cells << row_letter + col_number
+      end
+    end
+    horiz_cells_hash = {}
+    @@row_letters.each_with_index do |letter, index|
+      horiz_cells_hash[letter] = horiz_cells.slice!(0,10)
+    end
+    return horiz_cells_hash
+  end
+
+  def avail_vert_cells_init
+    vert_cells = []
+    @@col_numbers.each do |col_number|
+      @@row_letters.each do |row_letter|
+        vert_cells << row_letter + col_number
+      end
+    end
+    vert_cells_hash = {}
+    @@col_numbers.each_with_index do |number, index|
+      vert_cells_hash[number] = vert_cells.slice!(0,10)
+    end
+    return vert_cells_hash
+  end
+
+  def place_pieces
+    @ac = place_piece(@ac, position(@ac.length))
+    @bs = place_piece(@bs, position(@bs.length))
+    @cr = place_piece(@cr, position(@cr.length))
+    @ds = place_piece(@ds, position(@ds.length))
+    @sb = place_piece(@sb, position(@sb.length))
+  end
+
+  def position(piece_length)
+    if horiz_or_vert_position == "horiz"
+      position = avail_horiz_position(candidate_row, piece_length)
+    else
+      position = avail_vert_position(candidate_col, piece_length)
+    end
+    
+    return position
+  end
+
+  def horiz_or_vert_position
+    coin_flip = rand(2)
+    position = coin_flip == 1 ? "horiz" : "vert"
+    return position
+  end
+
+  def place_piece(piece, position)
+    piece = position 
+  end
+
+  def avail_horiz_position(row, length)
+    if @avail_horiz_cells_hash[row].length >= length
+      remove_cells_from_vert_hash(@avail_horiz_cells_hash[row].slice(0,length))
+      return @avail_horiz_cells_hash[row].slice!(0,length)
+    else
+      if letter_to_number(row) + 1 < 9
+        avail_horiz_position(number_to_letter(letter_to_number(row) + 1), length)
+      end
     end
   end
 
-  def place_piece(piece, available_cells)
-    available_cells.each_with_index do |cell, index|
-      piece[index] = cell
-      @taken["cell"] = piece_length_to_name(piece.length)
+  def avail_vert_position(col, length)
+    if @avail_vert_cells_hash[col].length >= length
+      remove_cells_from_horiz_hash(@avail_vert_cells_hash[col].slice(0,length))
+      return @avail_vert_cells_hash[col].slice!(0,length)
+    else
+      if col.to_i + 1 < 9
+        avail_vert_position("#{col.to_i + 1}", length)
+      end
     end
+  end
+
+  def remove_cells_from_vert_hash(cells_to_remove)
+    cells_to_remove.each do |elem|
+      key = elem.split("")[1]
+      @avail_vert_cells_hash[key].delete(elem)
+    end    
+  end
+
+  def remove_cells_from_horiz_hash(cells_to_remove)
+    cells_to_remove.each do |elem|
+      key = elem.split("")[0]
+      @avail_horiz_cells_hash[key].delete(elem)
+    end
+  end
+
+  def candidate_row
+    number_to_letter(rand(9))
+  end
+
+  def candidate_col
+    "#{rand(9).to_s}"
   end
 
   def piece_length_to_name(length) 
@@ -57,36 +150,24 @@ class Board
     @taken[cell] != nil ? true : false
   end
 
-  def cells_valid?(cells)
-    cells.each do |elem|
-      y_as_letter = elem.split("").first
-      x_as_number = elem.split("").last.to_i
+  # def cells_valid?(cells)
+  #   cells.each do |elem|
+  #     y_as_letter = elem.split("").first
+  #     x_as_number = elem.split("").last.to_i
 
-      if letter_to_number(y_as_letter) > 10 || 
-          letter_to_number(y_as_letter) < 0 || 
-          x_as_number > 10 || 
-          x_as_number < 0
-       return false
-      end
+  #     if letter_to_number(y_as_letter) > 9 || 
+  #         letter_to_number(y_as_letter) < 0 || 
+  #         x_as_number > 9 || 
+  #         x_as_number < 0
+  #      return false
+  #     end
 
-    end
+  #   end
 
-    return true
-  end 
+  #   return true
+  # end
 
-  # => if length # of cells open, returns their coords, otherwise returns -1
-  def cells_available_for_placement 
-    @avail_cells.each do |cells|
-      cells.each do |cell|
-        @taken[cell] = piece_length_to_name(cell.length)
-      end
-    end
-    @avail_cells.shift
-  end
 
-  def candidate_cell
-    number_to_letter(rand(10)) + "#{rand(11).to_s}"
-  end
 
   def candidate_direction
     direction_seed = rand(4)
@@ -105,5 +186,4 @@ class Board
 end
 
 b = Board.new
-b.place_pieces(b.pieces)
-
+# b.place_pieces(b.pieces)
